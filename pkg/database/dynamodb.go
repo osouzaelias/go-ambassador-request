@@ -7,7 +7,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	"log"
 )
 
 type DynamoDBConfig struct {
@@ -49,8 +48,7 @@ func (c *DynamoDBClient) GetItem(id string) (interface{}, error) {
 	item := make(map[string]interface{})
 	err = attributevalue.UnmarshalMap(out.Item, &item)
 	if err != nil {
-		log.Fatalf("failed to unmarshal item: %v", err)
-		return "", err
+		return nil, err
 	}
 
 	return item, nil

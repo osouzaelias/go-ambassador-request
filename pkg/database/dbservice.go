@@ -5,7 +5,7 @@ import (
 )
 
 type DbService interface {
-	GetItem(id string) (interface{}, error)
+	GetItem(id string) (any, error)
 	PutItem(item interface{}) error
 }
 

@@ -4,8 +4,10 @@ import (
 	"context"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"log"
 )
 
 type DynamoDBConfig struct {
@@ -28,11 +30,10 @@ func NewDynamoDBClient(c DynamoDBConfig) (DbService, error) {
 }
 
 func (c *DynamoDBClient) GetItem(id string) (interface{}, error) {
-	// Note: Simplified for brevity, actual implementation will depend on your data model
 	input := &dynamodb.GetItemInput{
 		TableName: aws.String(c.config.Table),
 		Key: map[string]types.AttributeValue{
-			"RequestID": &types.AttributeValueMemberS{Value: id},
+			"id": &types.AttributeValueMemberS{Value: id},
 		},
 	}
 
@@ -41,12 +42,21 @@ func (c *DynamoDBClient) GetItem(id string) (interface{}, error) {
 		return nil, err
 	}
 
-	return out.Item, nil
+	if out.Item == nil {
+		return nil, nil
+	}
+
+	item := make(map[string]interface{})
+	err = attributevalue.UnmarshalMap(out.Item, &item)
+	if err != nil {
+		log.Fatalf("failed to unmarshal item: %v", err)
+		return "", err
+	}
+
+	return item, nil
 }
 
 func (c *DynamoDBClient) PutItem(item interface{}) error {
-	// Note: Simplified for brevity, actual implementation will depend on your data model
-	// You would typically marshal the item into a map[string]types.AttributeValue
 	input := &dynamodb.PutItemInput{
 		TableName: aws.String(c.config.Table),
 		Item:      item.(map[string]types.AttributeValue),

@@ -3,11 +3,10 @@ package workacceptor
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/gofrs/uuid"
 	"log"
 	"net/http"
-	"os"
+
+	"github.com/gofrs/uuid"
 )
 
 type Request struct {
@@ -15,7 +14,8 @@ type Request struct {
 }
 
 type Handler struct {
-	sender *SQSMessageSender
+	sender   *SQSMessageSender
+	hostname string
 }
 
 func NewHandler() *Handler {
@@ -23,50 +23,50 @@ func NewHandler() *Handler {
 	if err != nil {
 		log.Fatalf("Failed to create SQS sender: %s", err)
 	}
-	return &Handler{sender: sqsSender}
+
+	return &Handler{
+		sender: sqsSender,
+		//hostname: os.Getenv("API_HOSTNAME"),
+		hostname: "localhost",
+	}
 }
 
-func (h *Handler) ProcessingWorkAcceptor(c *gin.Context) {
-	var request Request
-	if err := c.ShouldBindJSON(&request); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid input"})
+func (h *Handler) ProcessingWorkAcceptor(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed for this route", http.StatusMethodNotAllowed)
 		return
 	}
-	if request.Data == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid input"})
+
+	var request Request
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	requestID, _ := uuid.NewV4()
-	rqs := fmt.Sprintf("http://%s/api/v1/OperationStatusChecker/%s", os.Getenv("API_HOSTNAME"), requestID)
+	rqs := fmt.Sprintf("http://%s/api/v1/checker/%s", h.hostname, requestID)
 
-	addMetadata(&request, requestID)
+	request.Data["metadata"] = map[string]string{
+		"id": requestID.String(),
+	}
 
 	payload, err := json.Marshal(request.Data)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "error processing request"})
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	err = h.sender.SendMessage(string(payload))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "error processing request"})
-		return
-	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
 
-	c.JSON(http.StatusAccepted, gin.H{
+	_ = json.NewEncoder(w).Encode(map[string]any{
 		"message":     "Request Accepted for Processing",
 		"ProxyStatus": rqs,
 	})
-}
-
-func addMetadata(request *Request, requestID uuid.UUID) {
-	request.Data["metadata"] = map[string]string{
-		"RequestID": requestID.String(),
-	}
 }

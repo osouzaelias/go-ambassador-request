@@ -1,4 +1,4 @@
-package operationstatus
+package checker
 
 import (
 	"encoding/json"

@@ -6,14 +6,13 @@ import (
 
 type DbService interface {
 	GetItem(id string) (any, error)
-	PutItem(item interface{}) error
+	PutItem(item string) error
 }
 
 type DbType int
 
 const (
 	DynamoDB DbType = iota
-	DocumentDB
 )
 
 func NewDatabaseService(databaseType DbType, config interface{}) (DbService, error) {
@@ -24,12 +23,6 @@ func NewDatabaseService(databaseType DbType, config interface{}) (DbService, err
 			return nil, errors.New("invalid config for DynamoDB")
 		}
 		return NewDynamoDBClient(c)
-	case DocumentDB:
-		c, ok := config.(DocumentDBConfig)
-		if !ok {
-			return nil, errors.New("invalid config for DocumentDB")
-		}
-		return NewDocumentDBClient(c)
 	default:
 		return nil, errors.New("unknown database type")
 	}

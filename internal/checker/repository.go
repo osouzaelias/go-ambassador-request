@@ -1,4 +1,4 @@
-package operationstatus
+package checker
 
 import (
 	"go-ambassador-request/pkg/database"
@@ -25,4 +25,8 @@ func NewDynamoDbRepository() (*DynamoDbRepository, error) {
 
 func (s *DynamoDbRepository) GetItem(id string) (interface{}, error) {
 	return s.client.GetItem(id)
+}
+
+func (s *DynamoDbRepository) PutItem(msg string) error {
+	return s.client.PutItem(msg)
 }

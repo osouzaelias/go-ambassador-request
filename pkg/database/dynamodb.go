@@ -2,6 +2,8 @@ package database
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
@@ -32,7 +34,7 @@ func (c *DynamoDBClient) GetItem(id string) (interface{}, error) {
 	input := &dynamodb.GetItemInput{
 		TableName: aws.String(c.config.Table),
 		Key: map[string]types.AttributeValue{
-			"id": &types.AttributeValueMemberS{Value: id},
+			"_id": &types.AttributeValueMemberS{Value: id},
 		},
 	}
 
@@ -54,12 +56,24 @@ func (c *DynamoDBClient) GetItem(id string) (interface{}, error) {
 	return item, nil
 }
 
-func (c *DynamoDBClient) PutItem(item interface{}) error {
-	input := &dynamodb.PutItemInput{
-		TableName: aws.String(c.config.Table),
-		Item:      item.(map[string]types.AttributeValue),
+func (c *DynamoDBClient) PutItem(jsonStr string) error {
+	var item map[string]interface{}
+	err := json.Unmarshal([]byte(jsonStr), &item)
+	if err != nil {
+		fmt.Println("error unmarshalling JSON:", err)
+		return err
 	}
 
-	_, err := c.service.PutItem(context.TODO(), input)
+	av, err := attributevalue.MarshalMap(item)
+	if err != nil {
+		fmt.Println("Got error marshalling map:", err)
+	}
+
+	input := &dynamodb.PutItemInput{
+		TableName: aws.String(c.config.Table),
+		Item:      av,
+	}
+
+	_, err = c.service.PutItem(context.TODO(), input)
 	return err
 }

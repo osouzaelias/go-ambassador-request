@@ -1,10 +1,11 @@
-package workacceptor
+package acceptor
 
 import (
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/gofrs/uuid"
 )
@@ -25,9 +26,8 @@ func NewHandler() *Handler {
 	}
 
 	return &Handler{
-		sender: sqsSender,
-		//hostname: os.Getenv("API_HOSTNAME"),
-		hostname: "localhost",
+		sender:   sqsSender,
+		hostname: os.Getenv("API_HOSTNAME"),
 	}
 }
 
@@ -46,9 +46,7 @@ func (h *Handler) ProcessingWorkAcceptor(w http.ResponseWriter, r *http.Request)
 	requestID, _ := uuid.NewV4()
 	rqs := fmt.Sprintf("http://%s/api/v1/checker/%s", h.hostname, requestID)
 
-	request.Data["metadata"] = map[string]string{
-		"id": requestID.String(),
-	}
+	request.Data["_id"] = requestID.String()
 
 	payload, err := json.Marshal(request.Data)
 	if err != nil {

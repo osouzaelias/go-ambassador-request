@@ -2,14 +2,16 @@ package notification
 
 import (
 	"context"
+	"fmt"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 )
 
 type SQSConfig struct {
-	Region   string
-	QueueUrl string
+	Region              string
+	QueueUrl            string
+	MaxNumberOfMessages int32
 }
 
 type SQSClient struct {
@@ -41,24 +43,33 @@ func (c *SQSClient) SendMessage(message string) error {
 	return err
 }
 
-func (c *SQSClient) ReadMessage() (*Message, error) {
-	result, err := c.service.ReceiveMessage(context.TODO(), &sqs.ReceiveMessageInput{
+func (c *SQSClient) ReadMessage(messages chan<- *Message, errors chan<- error) {
+	output, err := c.service.ReceiveMessage(context.TODO(), &sqs.ReceiveMessageInput{
 		QueueUrl:            aws.String(c.config.QueueUrl),
-		MaxNumberOfMessages: 1,
+		MaxNumberOfMessages: c.config.MaxNumberOfMessages,
 		VisibilityTimeout:   30,
 		WaitTimeSeconds:     20,
 	})
 
 	if err != nil {
-		return nil, err
+		errors <- fmt.Errorf("error receiving messages: %w", err)
+		return
 	}
 
-	if len(result.Messages) == 0 {
-		return nil, nil
+	for _, message := range output.Messages {
+		messages <- &Message{
+			*message.MessageId,
+			*message.Body,
+			*message.ReceiptHandle,
+		}
 	}
+}
 
-	msg := result.Messages[0]
-	return &Message{
-		Body: *msg.Body,
-	}, nil
+func (c *SQSClient) DeleteMessage(id string) error {
+	_, err := c.service.DeleteMessage(context.Background(), &sqs.DeleteMessageInput{
+		QueueUrl:      &c.config.QueueUrl,
+		ReceiptHandle: aws.String(id),
+	})
+
+	return err
 }

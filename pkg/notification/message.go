@@ -6,18 +6,20 @@ import (
 
 type MessageService interface {
 	SendMessage(message string) error
-	ReadMessage() (*Message, error)
+	ReadMessage(messages chan<- *Message, errors chan<- error)
+	DeleteMessage(id string) error
 }
 
 type Message struct {
-	Body string
+	ID            string
+	Body          string
+	ReceiptHandle string
 }
 
 type BrokerType int
 
 const (
 	SQS BrokerType = iota
-	Kinesis
 )
 
 func NewMessageService(broker BrokerType, config interface{}) (MessageService, error) {
@@ -28,12 +30,6 @@ func NewMessageService(broker BrokerType, config interface{}) (MessageService, e
 			return nil, errors.New("invalid config for SQS")
 		}
 		return NewSQSClient(c)
-	case Kinesis:
-		c, ok := config.(KinesisConfig)
-		if !ok {
-			return nil, errors.New("invalid config for Kinesis")
-		}
-		return NewKinesisClient(c)
 	default:
 		return nil, errors.New("unknown notification type")
 	}

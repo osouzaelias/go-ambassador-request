@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/gofrs/uuid"
 )
@@ -43,10 +44,28 @@ func (h *Handler) ProcessingWorkAcceptor(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	url := r.Header.Get("AR-Destination-Url")
+	if len(strings.TrimSpace(url)) == 0 {
+		http.Error(w, "AR-Destination-Url header is missing", http.StatusBadRequest)
+		return
+	}
+
+	var headers = map[string][]string{}
+	for name, values := range r.Header {
+		if name != "AR-Destination-Url" && strings.HasPrefix(name, "AR-") {
+			headers[name] = values
+		}
+	}
+
+	if len(headers) > 0 {
+		request.Data["_headers"] = headers
+	}
+
 	requestID, _ := uuid.NewV4()
-	rqs := fmt.Sprintf("http://%s/api/v1/checker/%s", h.hostname, requestID)
+	proxyStatus := fmt.Sprintf("http://%s/api/v1/checker/%s", h.hostname, requestID)
 
 	request.Data["_id"] = requestID.String()
+	request.Data["_url"] = url
 
 	payload, err := json.Marshal(request.Data)
 	if err != nil {
@@ -65,6 +84,6 @@ func (h *Handler) ProcessingWorkAcceptor(w http.ResponseWriter, r *http.Request)
 
 	_ = json.NewEncoder(w).Encode(map[string]any{
 		"message":     "Request Accepted for Processing",
-		"ProxyStatus": rqs,
+		"proxyStatus": proxyStatus,
 	})
 }

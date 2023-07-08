@@ -1,21 +1,21 @@
 package checker
 
 import (
+	"go-ambassador-request/pkg/config"
 	"go-ambassador-request/pkg/database"
-	"os"
 )
 
 type DynamoDbRepository struct {
 	client database.DbService
 }
 
-func NewDynamoDbRepository() (*DynamoDbRepository, error) {
-	config := database.DynamoDBConfig{
-		Region: os.Getenv("REGION"),
-		Table:  os.Getenv("TABLE"),
+func NewDynamoDbRepository(cfg *config.Config) (*DynamoDbRepository, error) {
+	dbConfig := database.DynamoDBConfig{
+		Region: cfg.Region,
+		Table:  cfg.Table,
 	}
 
-	client, err := database.NewDatabaseService(database.DynamoDB, config)
+	client, err := database.NewDatabaseService(database.DynamoDB, dbConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -29,4 +29,8 @@ func (s *DynamoDbRepository) GetItem(id string) (interface{}, error) {
 
 func (s *DynamoDbRepository) PutItem(msg string) error {
 	return s.client.PutItem(msg)
+}
+
+func (s *DynamoDbRepository) UpdateItem(item string) error {
+	return s.client.UpdateItem(item)
 }

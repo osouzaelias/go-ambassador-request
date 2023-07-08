@@ -6,14 +6,15 @@ import (
 
 type MessageService interface {
 	SendMessage(message string) error
-	ReadMessage(messages chan<- *Message, errors chan<- error)
+	ReadMessage(message chan<- *Message, err chan<- error)
 	DeleteMessage(id string) error
 }
 
 type Message struct {
-	ID            string
-	Body          string
-	ReceiptHandle string
+	ID                      string
+	Body                    string
+	ReceiptHandle           string
+	ApproximateReceiveCount int
 }
 
 type BrokerType int

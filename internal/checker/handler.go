@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/google/uuid"
+	"go-ambassador-request/pkg/config"
 	"log"
 	"net/http"
 	"strings"
@@ -13,8 +14,8 @@ type Handler struct {
 	repo *DynamoDbRepository
 }
 
-func NewHandler() *Handler {
-	repository, err := NewDynamoDbRepository()
+func NewHandler(cfg *config.Config) *Handler {
+	repository, err := NewDynamoDbRepository(cfg)
 	if err != nil {
 		log.Fatalf("Failed to create DynamoDB repo: %s", err)
 	}

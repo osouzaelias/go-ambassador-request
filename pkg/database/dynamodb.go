@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"strings"
 )
 
 type DynamoDBConfig struct {
@@ -67,6 +68,7 @@ func (c *DynamoDBClient) PutItem(jsonStr string) error {
 	av, err := attributevalue.MarshalMap(item)
 	if err != nil {
 		fmt.Println("Got error marshalling map:", err)
+		return err
 	}
 
 	input := &dynamodb.PutItemInput{
@@ -75,5 +77,46 @@ func (c *DynamoDBClient) PutItem(jsonStr string) error {
 	}
 
 	_, err = c.service.PutItem(context.TODO(), input)
+	return err
+}
+
+func (c *DynamoDBClient) UpdateItem(jsonStr string) error {
+	var item map[string]interface{}
+	err := json.Unmarshal([]byte(jsonStr), &item)
+	if err != nil {
+		fmt.Println("error unmarshalling JSON:", err)
+		return err
+	}
+
+	primaryKey := item["_id"].(string)
+	delete(item, "_id")
+
+	av, err := attributevalue.MarshalMap(item)
+	if err != nil {
+		fmt.Println("Got error marshalling map:", err)
+		return err
+	}
+
+	updateExpression := "SET"
+	expressionAttributeValues := map[string]types.AttributeValue{}
+	expressionAttributeNames := map[string]string{}
+
+	for key, value := range av {
+		expressionAttributeValues[":"+key] = value
+		expressionAttributeNames["#"+key] = key
+		updateExpression += " #" + key + " = :" + key + ","
+	}
+	updateExpression = strings.TrimRight(updateExpression, ",")
+
+	input := &dynamodb.UpdateItemInput{
+		TableName:                 aws.String(c.config.Table),
+		Key:                       map[string]types.AttributeValue{"_id": &types.AttributeValueMemberS{Value: primaryKey}},
+		UpdateExpression:          aws.String(updateExpression),
+		ExpressionAttributeValues: expressionAttributeValues,
+		ExpressionAttributeNames:  expressionAttributeNames,
+		ReturnValues:              types.ReturnValueAllNew,
+	}
+
+	_, err = c.service.UpdateItem(context.TODO(), input)
 	return err
 }

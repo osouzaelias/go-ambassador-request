@@ -7,6 +7,7 @@ import (
 type DbService interface {
 	GetItem(id string) (any, error)
 	PutItem(item string) error
+	UpdateItem(item string) error
 }
 
 type DbType int

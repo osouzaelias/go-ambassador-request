@@ -3,6 +3,7 @@ package acceptor
 import (
 	"encoding/json"
 	"fmt"
+	"go-ambassador-request/pkg/config"
 	"log"
 	"net/http"
 	"os"
@@ -11,17 +12,13 @@ import (
 	"github.com/gofrs/uuid"
 )
 
-type Request struct {
-	Data map[string]interface{} `json:"data"`
-}
-
 type Handler struct {
 	sender   *SQSMessageSender
 	hostname string
 }
 
-func NewHandler() *Handler {
-	sqsSender, err := NewSQSMessageSender()
+func NewHandler(cfg *config.Config) *Handler {
+	sqsSender, err := NewSQSMessageSender(cfg)
 	if err != nil {
 		log.Fatalf("Failed to create SQS sender: %s", err)
 	}
@@ -50,33 +47,14 @@ func (h *Handler) ProcessingWorkAcceptor(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	var headers = map[string][]string{}
-	for name, values := range r.Header {
-		if name != "AR-Destination-Url" && strings.HasPrefix(name, "AR-") {
-			headers[name] = values
-		}
-	}
-
-	if len(headers) > 0 {
-		request.Data["_headers"] = headers
-	}
-
 	requestID, _ := uuid.NewV4()
 	proxyStatus := fmt.Sprintf("http://%s/api/v1/checker/%s", h.hostname, requestID)
 
-	request.Data["_id"] = requestID.String()
-	request.Data["_url"] = url
+	request.Data[metadataID] = requestID.String()
+	request.Data[metadataURL] = url
 
-	payload, err := json.Marshal(request.Data)
-	if err != nil {
+	if err := h.sender.SendMessage(request); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	err = h.sender.SendMessage(string(payload))
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")

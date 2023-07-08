@@ -6,6 +6,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
+	"strconv"
 )
 
 type SQSConfig struct {
@@ -43,24 +45,28 @@ func (c *SQSClient) SendMessage(message string) error {
 	return err
 }
 
-func (c *SQSClient) ReadMessage(messages chan<- *Message, errors chan<- error) {
+func (c *SQSClient) ReadMessage(msgChan chan<- *Message, errChan chan<- error) {
 	output, err := c.service.ReceiveMessage(context.TODO(), &sqs.ReceiveMessageInput{
 		QueueUrl:            aws.String(c.config.QueueUrl),
 		MaxNumberOfMessages: c.config.MaxNumberOfMessages,
 		VisibilityTimeout:   30,
 		WaitTimeSeconds:     20,
+		AttributeNames:      []types.QueueAttributeName{"ApproximateReceiveCount"},
 	})
 
 	if err != nil {
-		errors <- fmt.Errorf("error receiving messages: %w", err)
+		errChan <- fmt.Errorf("error receiving message: %w", err)
 		return
 	}
 
 	for _, message := range output.Messages {
-		messages <- &Message{
+		receiveCount, _ := strconv.Atoi(message.Attributes["ApproximateReceiveCount"])
+
+		msgChan <- &Message{
 			*message.MessageId,
 			*message.Body,
 			*message.ReceiptHandle,
+			receiveCount,
 		}
 	}
 }

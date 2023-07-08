@@ -1,9 +1,10 @@
 package acceptor
 
 import (
+	"encoding/json"
 	"fmt"
+	"go-ambassador-request/pkg/config"
 	"go-ambassador-request/pkg/notification"
-	"os"
 	"strconv"
 )
 
@@ -11,19 +12,19 @@ type SQSMessageSender struct {
 	client notification.MessageService
 }
 
-func NewSQSMessageSender() (*SQSMessageSender, error) {
-	maxNumberMessages, err := strconv.ParseInt(os.Getenv("MAX_NUMBER_MESSAGES"), 10, 32)
+func NewSQSMessageSender(cfg *config.Config) (*SQSMessageSender, error) {
+	maxNumberMessages, err := strconv.ParseInt(cfg.MaxNumberMessages, 10, 32)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert environment variable MAX_NUMBER_MESSAGES to int32: %w", err)
 	}
 
-	config := notification.SQSConfig{
-		Region:              os.Getenv("REGION"),
-		QueueUrl:            os.Getenv("SQS_QUEUE_URL"),
+	sqsConfig := notification.SQSConfig{
+		Region:              cfg.Region,
+		QueueUrl:            cfg.QueueUrl,
 		MaxNumberOfMessages: int32(maxNumberMessages),
 	}
 
-	client, err := notification.NewMessageService(notification.SQS, config)
+	client, err := notification.NewMessageService(notification.SQS, sqsConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -31,12 +32,13 @@ func NewSQSMessageSender() (*SQSMessageSender, error) {
 	return &SQSMessageSender{client: client}, nil
 }
 
-func (s *SQSMessageSender) SendMessage(msg string) error {
-	return s.client.SendMessage(msg)
+func (s *SQSMessageSender) SendMessage(req Request) error {
+	msg, _ := json.Marshal(req.Data)
+	return s.client.SendMessage(string(msg))
 }
 
-func (s *SQSMessageSender) ReadMessage(messages chan<- *notification.Message, errors chan<- error) {
-	s.client.ReadMessage(messages, errors)
+func (s *SQSMessageSender) ReadMessage(message chan<- *notification.Message, err chan<- error) {
+	s.client.ReadMessage(message, err)
 }
 
 func (s *SQSMessageSender) DeleteMessage(id string) error {
